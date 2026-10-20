@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sistema de Monitoreo Agroclimático — Maíz y Aguacate</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<style>
+  :root{--bg:#0d1f17;--panel:#122c20;--panel2:#16382a;--line:#204a37;--emerald:#10b981;--emerald2:#059669;--slate:#cbd5c0;--ink:#eafff2;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{background:var(--bg);color:var(--ink);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;}
+  .badge{background:var(--panel2);border:1px solid var(--line);color:var(--slate);}
+  table{border-collapse:collapse;width:100%;font-size:12px;}
+  th,td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left;white-space:nowrap;}
+  th{color:#8fd9b3;position:sticky;top:0;background:var(--panel2);}
+  tbody tr:hover{background:#163523;}
+  .sep-row td{background:#0a1a13;color:#5c9a79;text-align:center;font-weight:600;letter-spacing:.03em;}
+  .console{background:#081811;border:1px solid var(--line);border-radius:8px;color:#8fe3b5;}
+  .btn{background:var(--emerald);color:#04150d;font-weight:600;border-radius:8px;padding:.6rem 1rem;transition:background .15s;}
+  .btn:hover{background:#34d399;}
+  .btn:disabled{background:#2d3f35;color:#6b8577;cursor:not-allowed;}
+  .btn2{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.6rem 1rem;}
+  .btn2:hover{border-color:var(--emerald);}
+  input,select{background:#0a1a13;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:.5rem .6rem;}
+  ::-webkit-scrollbar{height:8px;width:8px;}::-webkit-scrollbar-thumb{background:#1f4432;border-radius:4px;}
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="sticky top-0 z-10 card !rounded-none border-x-0 border-t-0 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <p class="text-[11px] tracking-wide text-emerald-400/80">SISTEMA DE MONITOREO AGROCLIMÁTICO</p>
+    <h1 class="text-lg sm:text-xl font-bold">Cultivos de Maíz y Aguacate · México</h1>
+  </div>
+  <div class="flex gap-2 flex-wrap text-xs">
+    <span class="badge px-3 py-1 rounded-full">Registros: <span id="badgeCount" class="font-semibold text-emerald-300">0</span></span>
+    <span class="badge px-3 py-1 rounded-full">Ordenado por: <span id="badgeSorted" class="font-semibold text-emerald-300">—</span></span>
+    <span class="badge px-3 py-1 rounded-full">Método Alfa: <span id="badgeAlfa" class="font-semibold text-emerald-300">—</span></span>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+  <!-- FASE 1 -->
+  <section class="card p-5">
+    <h2 class="text-emerald-300 font-semibold mb-1">[1] INICIO Y CARGA DE DATOS — Fase 1</h2>
+    <p class="text-sm text-slate-300 mb-3">Carga 15,000 registros a un arreglo en RAM. Usa datos sintéticos generados en el navegador o sube tu propio CSV con las mismas 10 columnas.</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <button id="btnLoad" class="btn">Cargar 15,000 registros a RAM</button>
+      <label class="btn2 cursor-pointer">Subir CSV
+        <input id="fileInput" type="file" accept=".csv" class="hidden">
+      </label>
+      <span id="loadStatus" class="text-sm text-slate-400"></span>
+    </div>
+    <div id="loadConsole" class="console mono text-xs p-3 mt-3 hidden"></div>
+    <div id="tableWrap" class="mt-4 overflow-x-auto max-h-[420px] hidden rounded border border-[var(--line)]">
+      <p class="text-xs text-slate-400 px-2 pt-2">MUESTRA DE LOS REGISTROS EN RAM (primeros 30 / últimos 30)</p>
+      <table id="dataTable"><thead></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- FASE 2 -->
+  <section class="card p-5">
+    <h2 class="text-emerald-300 font-semibold mb-1">[2] MÓDULO DE ORDENAMIENTO — Fase 2</h2>
+    <p class="text-sm text-slate-300 mb-3">Selecciona al azar un campo clave y el algoritmo correspondiente (id_estacion → Radix/Counting · temperatura_promedio → Bucket · fecha_registro → Quick/Merge/Heap).</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <button id="btnSort" class="btn" disabled>Activar Disparador Aleatorio de Ordenación</button>
+      <button id="btnDlBitSort" class="btn2" disabled>Descargar bitacora_ordenacion.txt</button>
+      <button id="btnDlCsvSort" class="btn2 hidden">Descargar CSV ordenado</button>
+    </div>
+    <div id="sortConsole" class="console mono text-xs p-3 mt-3 hidden"></div>
+  </section>
+
+  <!-- FASE 3 -->
+  <section class="card p-5">
+    <h2 class="text-emerald-300 font-semibold mb-1">[3] MÓDULO DE BÚSQUEDA — Fase 3</h2>
+    <p class="text-sm text-slate-300 mb-3">Selecciona al azar Búsqueda Binaria (requiere RAM ordenada por el campo) o Búsqueda Lineal (cualquier campo).</p>
+    <div class="flex flex-wrap gap-3 items-end mb-2">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Campo a consultar</label>
+        <select id="searchField" class="w-48">
+          <option value="id_estacion">id_estacion</option>
+          <option value="fecha_registro">fecha_registro (AAAAMMDD)</option>
+          <option value="temperatura_promedio">temperatura_promedio</option>
+          <option value="estado">estado</option>
+          <option value="municipio">municipio</option>
+          <option value="tipo_cultivo_predominante">tipo_cultivo_predominante</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Valor a buscar</label>
+        <input id="searchValue" type="text" class="w-48" placeholder="ej. 4821">
+      </div>
+      <button id="btnSearch" class="btn" disabled>Activar Disparador Aleatorio de Búsqueda</button>
+      <button id="btnDlBitSearch" class="btn2" disabled>Descargar bitacora_busqueda.txt</button>
+    </div>
+    <div id="searchConsole" class="console mono text-xs p-3 mt-3 hidden"></div>
+    <div id="fichaWrap" class="mt-4 hidden">
+      <p class="text-xs text-slate-400 mb-2">FICHA TÉCNICA DEL REGISTRO LOCALIZADO</p>
+      <div id="ficha" class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm"></div>
+    </div>
+  </section>
+
+  <!-- CONTADOR -->
+  <section class="card p-5">
+    <h2 class="text-emerald-300 font-semibold mb-1">[4] Contador de Métodos y Método Alfa</h2>
+    <div id="counters" class="flex flex-wrap gap-2 mt-2 text-xs"></div>
+  </section>
+
+</main>
+
+<script>
+const FIELDS = ['id_estacion','temperatura_promedio','fecha_registro','estado','municipio','humedad_relativa','precipitacion_mm','tipo_cultivo_predominante','presion_atmosferica','velocidad_viento'];
+let RECORDS = [];
+let sortedField = null; // campo por el que RAM está actualmente ordenada
+let methodCounts = {};
+let firstSortDone = false;
+
+const $ = id => document.getElementById(id);
+const toNs = ms => ms * 1e6; // performance.now() da ms -> ns
+
+function bumpCounter(name){ methodCounts[name]=(methodCounts[name]||0)+1; renderCounters(); }
+function renderCounters(){
+  const wrap = $('counters'); wrap.innerHTML='';
+  const entries = Object.entries(methodCounts);
+  let alfa = entries.length ? entries.sort((a,b)=>b[1]-a[1])[0][0] : '—';
+  $('badgeAlfa').textContent = alfa;
+  entries.forEach(([k,v])=>{
+    const s=document.createElement('span');
+    s.className='badge px-3 py-1 rounded-full';
+    s.innerHTML = `${k}: <b class="text-emerald-300">${v}</b>`;
+    wrap.appendChild(s);
+  });
+}
+
+// ---------- GENERACIÓN DE DATOS SINTÉTICOS ----------
+const ESTADOS = {
+  'Michoacán':['Uruapan','Tacámbaro','Peribán','Los Reyes','Tancítaro'],
+  'Jalisco':['Zapotlán','Autlán','Tapalpa','Zapopan'],
+  'Sinaloa':['Culiacán','Guasave','Los Mochis'],
+  'Guanajuato':['Celaya','Salamanca','Irapuato'],
+  'Puebla':['Tehuacán','Huauchinango'],
+  'Estado de México':['Toluca','Atlacomulco']
+};
+const CULTIVOS = ['Maíz','Aguacate'];
+
+function genRecords(n){
+  const estados = Object.keys(ESTADOS);
+  const out = new Array(n);
+  for(let i=0;i<n;i++){
+    const estado = estados[Math.floor(Math.random()*estados.length)];
+    const municipios = ESTADOS[estado];
+    const municipio = municipios[Math.floor(Math.random()*municipios.length)];
+    const y = 2020+Math.floor(Math.random()*6), m=1+Math.floor(Math.random()*12), d=1+Math.floor(Math.random()*28);
+    out[i] = {
+      id_estacion: 1000+i,
+      temperatura_promedio: Math.round((12+Math.random()*22)*10)/10,
+      fecha_registro: y*10000+m*100+d,
+      estado, municipio,
+      humedad_relativa: Math.round((30+Math.random()*60)*10)/10,
+      precipitacion_mm: Math.round(Math.random()*120*10)/10,
+      tipo_cultivo_predominante: CULTIVOS[Math.floor(Math.random()*2)],
+      presion_atmosferica: Math.round((950+Math.random()*70)*10)/10,
+      velocidad_viento: Math.round(Math.random()*40*10)/10
+    };
+  }
+  return out;
+}
+
+function parseCsv(text){
+  const lines = text.trim().split(/\r?\n/);
+  const header = lines[0].split(',').map(h=>h.trim());
+  const idx = {}; header.forEach((h,i)=>idx[h]=i);
+  const out = [];
+  for(let i=1;i<lines.length;i++){
+    const parts = lines[i].split(',');
+    if(parts.length < header.length) continue;
+    out.push({
+      id_estacion: Number(parts[idx.id_estacion]),
+      temperatura_promedio: Number(parts[idx.temperatura_promedio]),
+      fecha_registro: Number(parts[idx.fecha_registro]),
+      estado: parts[idx.estado], municipio: parts[idx.municipio],
+      humedad_relativa: Number(parts[idx.humedad_relativa]),
+      precipitacion_mm: Number(parts[idx.precipitacion_mm]),
+      tipo_cultivo_predominante: parts[idx.tipo_cultivo_predominante],
+      presion_atmosferica: Number(parts[idx.presion_atmosferica]),
+      velocidad_viento: Number(parts[idx.velocidad_viento])
+    });
+  }
+  return out;
+}
+
+function toCsv(records){
+  const rows = [FIELDS.join(',')];
+  records.forEach(r=>rows.push(FIELDS.map(f=>r[f]).join(',')));
+  return rows.join('\n');
+}
+
+function download(filename, content){
+  const blob = new Blob([content],{type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ---------- RENDER TABLA ----------
+function renderTable(records){
+  const thead = document.querySelector('#dataTable thead');
+  const tbody = document.querySelector('#dataTable tbody');
+  thead.innerHTML = '<tr>'+FIELDS.map(f=>`<th>${f}</th>`).join('')+'</tr>';
+  tbody.innerHTML = '';
+  const first = records.slice(0,30), last = records.slice(-30);
+  const rowHtml = r => '<tr>'+FIELDS.map(f=>`<td>${r[f]}</td>`).join('')+'</tr>';
+  tbody.innerHTML += first.map(rowHtml).join('');
+  tbody.innerHTML += `<tr class="sep-row"><td colspan="${FIELDS.length}">⋯ ${records.length-60} registros intermedios omitidos ⋯</td></tr>`;
+  tbody.innerHTML += last.map(rowHtml).join('');
+  $('tableWrap').classList.remove('hidden');
+}
+
+// ---------- CARGA ----------
+$('btnLoad').addEventListener('click', ()=>{
+  const t0 = performance.now();
+  RECORDS = genRecords(15000);
+  const t1 = performance.now();
+  finishLoad(t1-t0);
+});
+$('fileInput').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const t0 = performance.now();
+    RECORDS = parseCsv(ev.target.result);
+    const t1 = performance.now();
+    finishLoad(t1-t0);
+  };
+  reader.readAsText(file);
+});
+function finishLoad(ms){
+  sortedField = null; firstSortDone = false;
+  $('badgeSorted').textContent = '—';
+  $('badgeCount').textContent = RECORDS.length.toLocaleString();
+  $('loadStatus').textContent = `${RECORDS.length.toLocaleString()} registros en RAM.`;
+  $('loadConsole').classList.remove('hidden');
+  $('loadConsole').textContent = `Se cargaron ${RECORDS.length.toLocaleString()} registros a RAM en ${toNs(ms).toLocaleString('en-US',{maximumFractionDigits:0})} nanosegundos.`;
+  renderTable(RECORDS);
+  $('btnSort').disabled = false; $('btnSearch').disabled = false;
+  $('btnDlCsvSort').classList.add('hidden');
+}
+
+// ---------- ALGORITMOS DE ORDENAMIENTO ----------
+// Cada función retorna {arr, comparisons, moves}
+function countingSort(records, field){
+  let comparisons=0, moves=0;
+  let max=-Infinity, min=Infinity;
+  for(const r of records){ comparisons++; if(r[field]>max)max=r[field]; if(r[field]<min)min=r[field]; }
+  const range = max-min+1;
+  const count = new Array(range).fill(0);
+  for(const r of records){ count[r[field]-min]++; moves++; }
+  for(let i=1;i<range;i++){ count[i]+=count[i-1]; comparisons++; }
+  const out = new Array(records.length);
+  for(let i=records.length-1;i>=0;i--){
+    const r = records[i];
+    out[count[r[field]-min]-1] = r;
+    count[r[field]-min]--;
+    moves++;
+  }
+  return {arr:out, comparisons, moves};
+}
+function radixSort(records, field){
+  let comparisons=0, moves=0;
+  let max=-Infinity;
+  for(const r of records){ comparisons++; if(r[field]>max)max=r[field]; }
+  let arr = records.slice();
+  for(let exp=1; Math.floor(max/exp)>0; exp*=10){
+    const buckets = Array.from({length:10},()=>[]);
+    for(const r of arr){
+      const digit = Math.floor(r[field]/exp)%10;
+      buckets[digit].push(r); moves++;
+    }
+    arr = [].concat(...buckets);
+    comparisons += 10;
+  }
+  return {arr, comparisons, moves};
+}
+function bucketSort(records, field){
+  let comparisons=0, moves=0;
+  let max=-Infinity, min=Infinity;
+  for(const r of records){ comparisons++; if(r[field]>max)max=r[field]; if(r[field]<min)min=r[field]; }
+  const n = records.length;
+  const bucketCount = Math.max(1, Math.ceil(Math.sqrt(n)));
+  const range = (max-min)||1;
+  const buckets = Array.from({length:bucketCount},()=>[]);
+  for(const r of records){
+    let idx = Math.floor(((r[field]-min)/range)*(bucketCount-1));
+    buckets[idx].push(r); moves++;
+  }
+  const out = [];
+  for(const b of buckets){
+    for(let i=1;i<b.length;i++){
+      let j=i; const key=b[j];
+      while(j>0){ comparisons++; if(b[j-1][field]>key[field]){ b[j]=b[j-1]; moves++; j--; } else break; }
+      b[j]=key; moves++;
+    }
+    out.push(...b);
+  }
+  return {arr:out, comparisons, moves};
+}
+function quickSort(records, field){
+  let comparisons=0, moves=0;
+  const arr = records.slice();
+  function partition(lo,hi){
+    const pivot = arr[hi][field];
+    let i=lo-1;
+    for(let j=lo;j<hi;j++){
+      comparisons++;
+      if(arr[j][field] <= pivot){ i++; [arr[i],arr[j]]=[arr[j],arr[i]]; moves+=2; }
+    }
+    [arr[i+1],arr[hi]]=[arr[hi],arr[i+1]]; moves+=2;
+    return i+1;
+  }
+  function qs(lo,hi){ if(lo<hi){ const p=partition(lo,hi); qs(lo,p-1); qs(p+1,hi); } }
+  qs(0, arr.length-1);
+  return {arr, comparisons, moves};
+}
+function mergeSort(records, field){
+  let comparisons=0, moves=0;
+  function ms(arr){
+    if(arr.length<=1) return arr;
+    const mid=arr.length>>1;
+    const left=ms(arr.slice(0,mid)), right=ms(arr.slice(mid));
+    const out=[]; let i=0,j=0;
+    while(i<left.length && j<right.length){
+      comparisons++;
+      if(left[i][field]<=right[j][field]){ out.push(left[i++]); } else { out.push(right[j++]); }
+      moves++;
+    }
+    while(i<left.length){ out.push(left[i++]); moves++; }
+    while(j<right.length){ out.push(right[j++]); moves++; }
+    return out;
+  }
+  return {arr: ms(records.slice()), comparisons, moves};
+}
+function heapSort(records, field){
+  let comparisons=0, moves=0;
+  const arr = records.slice(); const n=arr.length;
+  function heapify(size, root){
+    let largest=root, l=2*root+1, r=2*root+2;
+    if(l<size){ comparisons++; if(arr[l][field]>arr[largest][field]) largest=l; }
+    if(r<size){ comparisons++; if(arr[r][field]>arr[largest][field]) largest=r; }
+    if(largest!==root){ [arr[root],arr[largest]]=[arr[largest],arr[root]]; moves+=2; heapify(size,largest); }
+  }
+  for(let i=Math.floor(n/2)-1;i>=0;i--) heapify(n,i);
+  for(let i=n-1;i>0;i--){ [arr[0],arr[i]]=[arr[i],arr[0]]; moves+=2; heapify(i,0); }
+  return {arr, comparisons, moves};
+}
+
+const SORT_GROUPS = {
+  id_estacion: [{name:'Radix Sort', fn:radixSort},{name:'Counting Sort', fn:countingSort}],
+  temperatura_promedio: [{name:'Bucket Sort', fn:bucketSort}],
+  fecha_registro: [{name:'Quick Sort', fn:quickSort},{name:'Merge Sort', fn:mergeSort},{name:'Heap Sort', fn:heapSort}]
+};
+
+$('btnSort').addEventListener('click', ()=>{
+  const fields = Object.keys(SORT_GROUPS);
+  const field = fields[Math.floor(Math.random()*fields.length)];
+  const options = SORT_GROUPS[field];
+  const choice = options[Math.floor(Math.random()*options.length)];
+
+  const t0 = performance.now();
+  const {arr, comparisons, moves} = choice.fn(RECORDS, field);
+  const t1 = performance.now();
+  RECORDS = arr; sortedField = field;
+  const ns = toNs(t1-t0);
+
+  bumpCounter(choice.name);
+  $('badgeSorted').textContent = field;
+
+  const msg = `Se ordenaron 15,000 registros por el campo ${field} usando el método ${choice.name} en ${ns.toLocaleString('en-US',{maximumFractionDigits:0})} nanosegundos. Comparaciones: ${comparisons.toLocaleString()}, Asignaciones/Movimientos de Memoria: ${moves.toLocaleString()}.`;
+  $('sortConsole').classList.remove('hidden');
+  $('sortConsole').textContent = msg;
+  window._ultimaBitacoraOrdenacion = msg;
+  $('btnDlBitSort').disabled = false;
+  renderTable(RECORDS);
+
+  if(!firstSortDone){
+    firstSortDone = true;
+    $('btnDlCsvSort').classList.remove('hidden');
+  }
+});
+$('btnDlBitSort').addEventListener('click', ()=> download('bitacora_ordenacion.txt', window._ultimaBitacoraOrdenacion||''));
+$('btnDlCsvSort').addEventListener('click', ()=> download('registros_ordenados.csv', toCsv(RECORDS)));
+
+// ---------- BÚSQUEDA ----------
+function linearSearch(records, field, value){
+  let comparisons=0;
+  for(let i=0;i<records.length;i++){
+    comparisons++;
+    if(String(records[i][field]) === String(value)) return {index:i, comparisons};
+  }
+  return {index:-1, comparisons};
+}
+function binarySearch(records, field, value){
+  let comparisons=0, lo=0, hi=records.length-1;
+  const target = isNaN(value) ? value : Number(value);
+  while(lo<=hi){
+    comparisons++;
+    const mid = (lo+hi)>>1;
+    const midVal = records[mid][field];
+    if(midVal === target) return {index:mid, comparisons};
+    if(midVal < target) lo = mid+1; else hi = mid-1;
+  }
+  return {index:-1, comparisons};
+}
+
+$('btnSearch').addEventListener('click', ()=>{
+  const field = $('searchField').value;
+  const value = $('searchValue').value.trim();
+  if(value===''){ alert('Ingresa un valor a buscar.'); return; }
+
+  const isBinary = Math.random() < 0.5;
+
+  if(isBinary){
+    if(sortedField !== field){
+      alert(`VALIDACIÓN DE SEGURIDAD FÍSICA DE RAM: la memoria no está ordenada por "${field}". Ejecuta primero el Disparador de Ordenación con ese campo clave antes de usar Búsqueda Binaria.`);
+      return;
+    }
+    runSearch('Búsqueda Binaria', field, value, binarySearch);
+  } else {
+    runSearch('Búsqueda Lineal', field, value, linearSearch);
+  }
+});
+
+function runSearch(methodName, field, value, fn){
+  const t0 = performance.now();
+  const {index, comparisons} = fn(RECORDS, field, value);
+  const t1 = performance.now();
+  const ns = toNs(t1-t0);
+
+  bumpCounter(methodName);
+
+  const msg = `Se realizó la búsqueda en 15,000 registros por el campo ${field} usando el método ${methodName} en ${ns.toLocaleString('en-US',{maximumFractionDigits:0})} nanosegundos. Comparaciones: ${comparisons.toLocaleString()}.`;
+  $('searchConsole').classList.remove('hidden');
+  $('searchConsole').textContent = msg;
+  window._ultimaBitacoraBusqueda = msg;
+  $('btnDlBitSearch').disabled = false;
+
+  if(index===-1){
+    $('fichaWrap').classList.add('hidden');
+    $('searchConsole').textContent += '\nResultado: valor no localizado en RAM.';
+    return;
+  }
+  const r = RECORDS[index];
+  $('fichaWrap').classList.remove('hidden');
+  $('ficha').innerHTML = `
+    <div class="card p-3"><p class="text-slate-400 text-xs">Fila/Índice en RAM</p><p class="font-semibold text-emerald-300">${index}</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">id_estacion</p><p class="font-semibold">${r.id_estacion}</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">fecha_registro</p><p class="font-semibold">${r.fecha_registro}</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">Estado / Municipio</p><p class="font-semibold">${r.estado} / ${r.municipio}</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">Cultivo predominante</p><p class="font-semibold">${r.tipo_cultivo_predominante}</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">Temperatura promedio</p><p class="font-semibold">${r.temperatura_promedio} °C</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">Humedad relativa</p><p class="font-semibold">${r.humedad_relativa} %</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">Precipitación</p><p class="font-semibold">${r.precipitacion_mm} mm</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">Presión atmosférica</p><p class="font-semibold">${r.presion_atmosferica} hPa</p></div>
+    <div class="card p-3"><p class="text-slate-400 text-xs">Velocidad del viento</p><p class="font-semibold">${r.velocidad_viento} km/h</p></div>
+  `;
+}
+$('btnDlBitSearch').addEventListener('click', ()=> download('bitacora_busqueda.txt', window._ultimaBitacoraBusqueda||''));
+</script>
+</body>
+</html>
